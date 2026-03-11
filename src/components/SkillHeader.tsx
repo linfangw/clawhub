@@ -259,8 +259,9 @@ export function SkillHeader({
                 sha256hash={latestVersion?.sha256hash}
                 vtAnalysis={latestVersion?.vtAnalysis}
                 llmAnalysis={latestVersion?.llmAnalysis as LlmAnalysis | undefined}
+                staticFindings={latestVersion?.staticScan?.findings}
               />
-              {latestVersion?.sha256hash || latestVersion?.llmAnalysis ? (
+              {latestVersion?.sha256hash || latestVersion?.llmAnalysis || (latestVersion?.staticScan?.findings?.length ?? 0) > 0 ? (
                 <p className="scan-disclaimer">
                   Like a lobster shell, security has layers — review code before you run it.
                 </p>

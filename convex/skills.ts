@@ -2420,6 +2420,7 @@ export const getSkillsWithStaleModerationReasonInternal = internalQuery({
       slug: string
       currentReason: string
       vtStatus: string | null
+      sha256hash: string | null
     }> = []
 
     for (const skill of [...vtPending, ...pendingScan]) {
@@ -2436,6 +2437,7 @@ export const getSkillsWithStaleModerationReasonInternal = internalQuery({
         slug: skill.slug,
         currentReason: skill.moderationReason,
         vtStatus: version.vtAnalysis.status,
+        sha256hash: version.sha256hash ?? null,
       })
     }
 
@@ -2480,6 +2482,33 @@ export const getPendingVTSkillsInternal = internalQuery({
     }
 
     return results
+  },
+})
+
+/**
+ * Emergency escalation by skillId for legacy rows without sha256hash.
+ * Patches moderationReason, moderationFlags, moderationStatus, and isSuspicious atomically.
+ */
+export const escalateSkillByIdInternal = internalMutation({
+  args: {
+    skillId: v.id('skills'),
+    moderationReason: v.string(),
+    moderationFlags: v.array(v.string()),
+    moderationStatus: v.union(v.literal('active'), v.literal('hidden')),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now()
+    await ctx.db.patch(args.skillId, {
+      moderationReason: args.moderationReason,
+      moderationFlags: args.moderationFlags,
+      moderationStatus: args.moderationStatus,
+      isSuspicious: computeIsSuspicious({
+        moderationFlags: args.moderationFlags,
+        moderationReason: args.moderationReason,
+      }),
+      hiddenAt: args.moderationStatus === 'hidden' ? now : undefined,
+      updatedAt: now,
+    })
   },
 })
 
@@ -2966,7 +2995,7 @@ export const approveSkillByHashInternal = internalMutation({
 
       const now = Date.now()
       const qualityLocked = skill.moderationReason === 'quality.low' && !isMalicious
-      const nextModerationStatus = qualityLocked ? 'hidden' : 'active'
+      const nextModerationStatus = isMalicious ? 'hidden' : qualityLocked ? 'hidden' : 'active'
       const nextModerationReason = qualityLocked
         ? 'quality.low'
         : bypassSuspicious
