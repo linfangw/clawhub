@@ -994,6 +994,39 @@ describe("packages public queries", () => {
     );
   });
 
+  it("keeps runtimeId pinned to the promoted release for non-latest publishes", async () => {
+    const ctx = makeInsertReleaseCtx(
+      makePackageDoc({
+        family: "bundle-plugin",
+        runtimeId: "bundle.current",
+        tags: { latest: "packageReleases:demo-1" },
+        latestReleaseId: "packageReleases:demo-1",
+        stats: { downloads: 0, installs: 0, stars: 0, versions: 1 },
+      }),
+    );
+
+    await insertReleaseInternalHandler(ctx, {
+      userId: "users:owner",
+      name: "demo-plugin",
+      displayName: "Demo Plugin",
+      family: "bundle-plugin",
+      version: "0.9.9",
+      changelog: "legacy branch",
+      tags: ["legacy"],
+      summary: "legacy summary",
+      files: [],
+      integritySha256: "abc123",
+      runtimeId: "bundle.legacy",
+    });
+
+    expect(ctx.patch).toHaveBeenCalledWith(
+      "packages:demo",
+      expect.objectContaining({
+        runtimeId: "bundle.current",
+      }),
+    );
+  });
+
   it("removes moved dist-tags from older package releases", async () => {
     const olderRelease = makeReleaseDoc({
       _id: "packageReleases:old",

@@ -7,7 +7,7 @@ import { buildPackageUploadEntries, filterIgnoredPackageFiles } from "../../lib/
 import { useAuthStatus } from "../../lib/useAuthStatus";
 import { formatBytes, formatPublishError, hashFile, uploadFile } from "../upload/-utils";
 
-export const Route = createFileRoute("/packages/publish")({
+export const Route = createFileRoute("/packages/new")({
   component: PublishPackageRoute,
 });
 

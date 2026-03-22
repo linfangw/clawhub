@@ -1039,7 +1039,7 @@ export const insertReleaseInternal = internalMutation({
       displayName: args.displayName,
       summary: shouldPromoteLatest ? args.summary : pkg.summary,
       sourceRepo: args.sourceRepo,
-      runtimeId: args.runtimeId,
+      runtimeId: shouldPromoteLatest ? args.runtimeId : pkg.runtimeId,
       channel: nextChannel,
       isOfficial: nextIsOfficial,
       latestReleaseId: shouldPromoteLatest ? releaseId : pkg.latestReleaseId,

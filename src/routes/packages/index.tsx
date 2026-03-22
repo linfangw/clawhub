@@ -150,7 +150,7 @@ export function PackagesIndex() {
               />
               Executes code
             </label>
-            <Link className="btn" to="/packages/publish">
+            <Link className="btn" to="/packages/new">
               Publish Plugin
             </Link>
           </div>

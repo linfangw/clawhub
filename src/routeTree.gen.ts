@@ -23,7 +23,7 @@ import { Route as SkillsIndexRouteImport } from './routes/skills/index'
 import { Route as PackagesIndexRouteImport } from './routes/packages/index'
 import { Route as UHandleRouteImport } from './routes/u/$handle'
 import { Route as SoulsSlugRouteImport } from './routes/souls/$slug'
-import { Route as PackagesPublishRouteImport } from './routes/packages/publish'
+import { Route as PackagesNewRouteImport } from './routes/packages/new'
 import { Route as PackagesNameRouteImport } from './routes/packages/$name'
 import { Route as CliAuthRouteImport } from './routes/cli/auth'
 import { Route as OwnerSlugRouteImport } from './routes/$owner/$slug'
@@ -98,9 +98,9 @@ const SoulsSlugRoute = SoulsSlugRouteImport.update({
   path: '/souls/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PackagesPublishRoute = PackagesPublishRouteImport.update({
-  id: '/packages/publish',
-  path: '/packages/publish',
+const PackagesNewRoute = PackagesNewRouteImport.update({
+  id: '/packages/new',
+  path: '/packages/new',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PackagesNameRoute = PackagesNameRouteImport.update({
@@ -132,7 +132,7 @@ export interface FileRoutesByFullPath {
   '/$owner/$slug': typeof OwnerSlugRoute
   '/cli/auth': typeof CliAuthRoute
   '/packages/$name': typeof PackagesNameRoute
-  '/packages/publish': typeof PackagesPublishRoute
+  '/packages/new': typeof PackagesNewRoute
   '/souls/$slug': typeof SoulsSlugRoute
   '/u/$handle': typeof UHandleRoute
   '/packages/': typeof PackagesIndexRoute
@@ -152,7 +152,7 @@ export interface FileRoutesByTo {
   '/$owner/$slug': typeof OwnerSlugRoute
   '/cli/auth': typeof CliAuthRoute
   '/packages/$name': typeof PackagesNameRoute
-  '/packages/publish': typeof PackagesPublishRoute
+  '/packages/new': typeof PackagesNewRoute
   '/souls/$slug': typeof SoulsSlugRoute
   '/u/$handle': typeof UHandleRoute
   '/packages': typeof PackagesIndexRoute
@@ -173,7 +173,7 @@ export interface FileRoutesById {
   '/$owner/$slug': typeof OwnerSlugRoute
   '/cli/auth': typeof CliAuthRoute
   '/packages/$name': typeof PackagesNameRoute
-  '/packages/publish': typeof PackagesPublishRoute
+  '/packages/new': typeof PackagesNewRoute
   '/souls/$slug': typeof SoulsSlugRoute
   '/u/$handle': typeof UHandleRoute
   '/packages/': typeof PackagesIndexRoute
@@ -195,7 +195,7 @@ export interface FileRouteTypes {
     | '/$owner/$slug'
     | '/cli/auth'
     | '/packages/$name'
-    | '/packages/publish'
+    | '/packages/new'
     | '/souls/$slug'
     | '/u/$handle'
     | '/packages/'
@@ -215,7 +215,7 @@ export interface FileRouteTypes {
     | '/$owner/$slug'
     | '/cli/auth'
     | '/packages/$name'
-    | '/packages/publish'
+    | '/packages/new'
     | '/souls/$slug'
     | '/u/$handle'
     | '/packages'
@@ -235,7 +235,7 @@ export interface FileRouteTypes {
     | '/$owner/$slug'
     | '/cli/auth'
     | '/packages/$name'
-    | '/packages/publish'
+    | '/packages/new'
     | '/souls/$slug'
     | '/u/$handle'
     | '/packages/'
@@ -256,7 +256,7 @@ export interface RootRouteChildren {
   OwnerSlugRoute: typeof OwnerSlugRoute
   CliAuthRoute: typeof CliAuthRoute
   PackagesNameRoute: typeof PackagesNameRoute
-  PackagesPublishRoute: typeof PackagesPublishRoute
+  PackagesNewRoute: typeof PackagesNewRoute
   SoulsSlugRoute: typeof SoulsSlugRoute
   UHandleRoute: typeof UHandleRoute
   PackagesIndexRoute: typeof PackagesIndexRoute
@@ -364,11 +364,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SoulsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/packages/publish': {
-      id: '/packages/publish'
-      path: '/packages/publish'
-      fullPath: '/packages/publish'
-      preLoaderRoute: typeof PackagesPublishRouteImport
+    '/packages/new': {
+      id: '/packages/new'
+      path: '/packages/new'
+      fullPath: '/packages/new'
+      preLoaderRoute: typeof PackagesNewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/packages/$name': {
@@ -408,7 +408,7 @@ const rootRouteChildren: RootRouteChildren = {
   OwnerSlugRoute: OwnerSlugRoute,
   CliAuthRoute: CliAuthRoute,
   PackagesNameRoute: PackagesNameRoute,
-  PackagesPublishRoute: PackagesPublishRoute,
+  PackagesNewRoute: PackagesNewRoute,
   SoulsSlugRoute: SoulsSlugRoute,
   UHandleRoute: UHandleRoute,
   PackagesIndexRoute: PackagesIndexRoute,

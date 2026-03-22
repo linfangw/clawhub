@@ -102,15 +102,7 @@ async function syncPackageSearchDigest(
   const owner = await ctx.db.get(pkg.ownerUserId);
   await upsertPackageSearchDigest(ctx, {
     ...fields,
-    latestVersion:
-      latestRelease &&
-      typeof latestRelease === "object" &&
-      latestRelease &&
-      "softDeletedAt" in latestRelease &&
-      "version" in latestRelease &&
-      !latestRelease.softDeletedAt
-        ? latestRelease.version
-        : undefined,
+    latestVersion: latestRelease && !latestRelease.softDeletedAt ? latestRelease.version : undefined,
     ownerHandle:
       owner &&
       typeof owner === "object" &&
