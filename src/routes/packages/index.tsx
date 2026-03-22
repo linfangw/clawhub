@@ -5,14 +5,21 @@ import { fetchPackages, type PackageListItem } from "../../lib/packageApi";
 
 type PackageSearchState = {
   q?: string;
+  cursor?: string;
   family?: "skill" | "code-plugin" | "bundle-plugin";
   official?: boolean;
   executesCode?: boolean;
 };
 
+type PackagesLoaderData = {
+  items: PackageListItem[];
+  nextCursor: string | null;
+};
+
 export const Route = createFileRoute("/packages/")({
   validateSearch: (search): PackageSearchState => ({
     q: typeof search.q === "string" && search.q.trim() ? search.q.trim() : undefined,
+    cursor: typeof search.cursor === "string" && search.cursor ? search.cursor : undefined,
     family:
       search.family === "skill" ||
       search.family === "code-plugin" ||
@@ -34,13 +41,17 @@ export const Route = createFileRoute("/packages/")({
   loader: async ({ deps }) => {
     const data = await fetchPackages({
       q: deps.q,
+      cursor: deps.q ? undefined : deps.cursor,
       family: deps.family,
       isOfficial: deps.official,
       executesCode: deps.executesCode,
       limit: 50,
     });
     const items = "results" in data ? data.results.map((entry) => entry.package) : data.items;
-    return { items };
+    return {
+      items,
+      nextCursor: "results" in data ? null : data.nextCursor,
+    } satisfies PackagesLoaderData;
   },
   component: PackagesIndex,
 });
@@ -56,10 +67,10 @@ function familyLabel(family: PackageListItem["family"]) {
   }
 }
 
-function PackagesIndex() {
+export function PackagesIndex() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const { items } = Route.useLoaderData();
+  const { items, nextCursor } = Route.useLoaderData() as PackagesLoaderData;
   const [query, setQuery] = useState(search.q ?? "");
 
   useEffect(() => {
@@ -84,6 +95,7 @@ function PackagesIndex() {
             void navigate({
               search: (prev) => ({
                 ...prev,
+                cursor: undefined,
                 q: query.trim() || undefined,
               }),
             });
@@ -105,6 +117,7 @@ function PackagesIndex() {
                 void navigate({
                   search: (prev) => ({
                     ...prev,
+                    cursor: undefined,
                     family: value || undefined,
                   }),
                 });
@@ -123,6 +136,7 @@ function PackagesIndex() {
                   void navigate({
                     search: (prev) => ({
                       ...prev,
+                      cursor: undefined,
                       official: event.target.checked || undefined,
                     }),
                   });
@@ -138,6 +152,7 @@ function PackagesIndex() {
                   void navigate({
                     search: (prev) => ({
                       ...prev,
+                      cursor: undefined,
                       executesCode: event.target.checked || undefined,
                     }),
                   });
@@ -155,39 +170,85 @@ function PackagesIndex() {
       {items.length === 0 ? (
         <div className="card">No packages match that filter.</div>
       ) : (
-        <div className="grid">
-          {items.map((item) => (
-            <Link
-              key={item.name}
-              to="/packages/$name"
-              params={{ name: item.name }}
-              className="skill-card"
+        <>
+          <div className="grid">
+            {items.map((item) => (
+              <Link
+                key={item.name}
+                to="/packages/$name"
+                params={{ name: item.name }}
+                className="skill-card"
+              >
+                <div className="skill-card-tags">
+                  <span className="tag">{familyLabel(item.family)}</span>
+                  <span className={`tag ${item.executesCode ? "tag-accent" : ""}`}>
+                    {item.executesCode ? "Executes code" : "Bundle only"}
+                  </span>
+                  {item.isOfficial ? <span className="tag">Official</span> : null}
+                  {item.verificationTier ? <span className="tag">{item.verificationTier}</span> : null}
+                </div>
+                <div className="skill-card-title">{item.displayName}</div>
+                <div className="skills-row-slug">{item.name}</div>
+                <div className="skill-card-summary">
+                  {item.summary ?? "No summary provided."}
+                </div>
+                <div className="skill-card-footer skill-card-footer-rows">
+                  <div className="stat">Channel: {item.channel}</div>
+                  <div className="stat">
+                    {item.ownerHandle ? `by ${item.ownerHandle}` : "community package"}
+                  </div>
+                  <div className="stat">
+                    {item.latestVersion ? `v${item.latestVersion}` : "No releases yet"}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+          {!search.q && (search.cursor || nextCursor) ? (
+            <div
+              className="card"
+              style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "space-between", marginTop: 18 }}
             >
-              <div className="skill-card-tags">
-                <span className="tag">{familyLabel(item.family)}</span>
-                <span className={`tag ${item.executesCode ? "tag-accent" : ""}`}>
-                  {item.executesCode ? "Executes code" : "Bundle only"}
-                </span>
-                {item.isOfficial ? <span className="tag">Official</span> : null}
-                {item.verificationTier ? <span className="tag">{item.verificationTier}</span> : null}
+              <div className="section-subtitle" style={{ margin: 0 }}>
+                Browsing {items.length} package{items.length === 1 ? "" : "s"} per page.
               </div>
-              <div className="skill-card-title">{item.displayName}</div>
-              <div className="skills-row-slug">{item.name}</div>
-              <div className="skill-card-summary">
-                {item.summary ?? "No summary provided."}
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                {search.cursor ? (
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() => {
+                      void navigate({
+                        search: (prev) => ({
+                          ...prev,
+                          cursor: undefined,
+                        }),
+                      });
+                    }}
+                  >
+                    First page
+                  </button>
+                ) : null}
+                {nextCursor ? (
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    onClick={() => {
+                      void navigate({
+                        search: (prev) => ({
+                          ...prev,
+                          cursor: nextCursor,
+                        }),
+                      });
+                    }}
+                  >
+                    Next page
+                  </button>
+                ) : null}
               </div>
-              <div className="skill-card-footer skill-card-footer-rows">
-                <div className="stat">Channel: {item.channel}</div>
-                <div className="stat">
-                  {item.ownerHandle ? `by ${item.ownerHandle}` : "community package"}
-                </div>
-                <div className="stat">
-                  {item.latestVersion ? `v${item.latestVersion}` : "No releases yet"}
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+            </div>
+          ) : null}
+        </>
       )}
     </main>
   );

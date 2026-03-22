@@ -164,11 +164,25 @@ function makeReleaseDoc(overrides: Partial<Record<string, unknown>> = {}) {
 function makeDigestCtx(options: {
   pages?: Array<{ page: Array<Record<string, unknown>>; isDone: boolean; continueCursor: string }>;
 }) {
-  const paginate = vi.fn();
+  const pageByCursor = new Map<
+    string | null,
+    { page: Array<Record<string, unknown>>; isDone: boolean; continueCursor: string }
+  >();
   const indexNames: string[] = [];
+  let cursor: string | null = null;
   for (const page of options.pages ?? []) {
-    paginate.mockResolvedValueOnce(page);
+    pageByCursor.set(cursor, page);
+    cursor = page.continueCursor || null;
   }
+  const paginate = vi.fn(async (args: { cursor: string | null }) => {
+    return (
+      pageByCursor.get(args.cursor ?? null) ?? {
+        page: [],
+        isDone: true,
+        continueCursor: "",
+      }
+    );
+  });
   const withIndex = vi.fn((indexName: string) => {
     indexNames.push(indexName);
     return {
@@ -258,7 +272,9 @@ function makePackageCtx(options: {
     continueCursor: "",
   };
 
+  const releaseIndexNames: string[] = [];
   return {
+    releaseIndexNames,
     ctx: {
       db: {
         get: vi.fn(async (id: string) => {
@@ -280,17 +296,27 @@ function makePackageCtx(options: {
               page: versionsPage.page.filter((release) => release.softDeletedAt === undefined),
             };
             return {
-              withIndex: vi.fn((_indexName: string) => ({
-                unique: vi.fn().mockResolvedValue(versionRelease),
-                filter: vi.fn(() => ({
-                  order: vi.fn(() => ({
-                    paginate: vi.fn().mockResolvedValue(filteredVersionsPage),
+              withIndex: vi.fn((indexName: string) => {
+                releaseIndexNames.push(indexName);
+                if (indexName === "by_package_active_created") {
+                  return {
+                    order: vi.fn(() => ({
+                      paginate: vi.fn().mockResolvedValue(filteredVersionsPage),
+                    })),
+                  };
+                }
+                return {
+                  unique: vi.fn().mockResolvedValue(versionRelease),
+                  filter: vi.fn(() => ({
+                    order: vi.fn(() => ({
+                      paginate: vi.fn().mockResolvedValue(filteredVersionsPage),
+                    })),
                   })),
-                })),
-                order: vi.fn(() => ({
-                  paginate: vi.fn().mockResolvedValue(versionsPage),
-                })),
-              })),
+                  order: vi.fn(() => ({
+                    paginate: vi.fn().mockResolvedValue(versionsPage),
+                  })),
+                };
+              }),
             };
           }
           throw new Error(`Unexpected table ${table}`);
@@ -335,7 +361,32 @@ describe("packages public queries", () => {
     expect(first.page.map((entry) => entry.name)).toEqual(["alpha", "bravo"]);
     expect(second.page.map((entry) => entry.name)).toEqual(["charlie", "delta"]);
     expect(third.page.map((entry) => entry.name)).toEqual(["echo"]);
-    expect(paginate).toHaveBeenCalledTimes(2);
+    expect(paginate).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps package page cursors compact even with large summaries", async () => {
+    const { ctx } = makeDigestCtx({
+      pages: [
+        {
+          page: [
+            makeDigest("alpha", { summary: "a".repeat(8_000) }),
+            makeDigest("bravo", { summary: "b".repeat(8_000) }),
+            makeDigest("charlie", { summary: "c".repeat(8_000) }),
+          ],
+          isDone: false,
+          continueCursor: "cursor:1",
+        },
+      ],
+    });
+
+    const result = await listPublicPageHandler(ctx, {
+      paginationOpts: { cursor: null, numItems: 1 },
+    });
+
+    expect(result.page.map((entry) => entry.name)).toEqual(["alpha"]);
+    expect(result.continueCursor.length).toBeLessThan(512);
+    expect(result.continueCursor).not.toContain("aaaaaaaa");
+    expect(result.continueCursor).not.toContain("bravo summary");
   });
 
   it("excludes private packages from public list pages", async () => {
@@ -625,7 +676,7 @@ describe("packages public queries", () => {
   });
 
   it("hides soft-deleted releases from public version lists", async () => {
-    const { ctx } = makePackageCtx({
+    const { ctx, releaseIndexNames } = makePackageCtx({
       versionsPage: {
         page: [
           makeReleaseDoc({ version: "1.1.0", softDeletedAt: 10 }),
@@ -642,6 +693,7 @@ describe("packages public queries", () => {
     });
 
     expect(result.page.map((entry) => entry.version)).toEqual(["1.0.0"]);
+    expect(releaseIndexNames).toContain("by_package_active_created");
   });
 
   it("rejects family changes on an existing package name", async () => {

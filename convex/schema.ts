@@ -620,6 +620,7 @@ const packageReleases = defineTable({
   softDeletedAt: v.optional(v.number()),
 })
   .index("by_package", ["packageId"])
+  .index("by_package_active_created", ["packageId", "softDeletedAt", "createdAt"])
   .index("by_package_version", ["packageId", "version"]);
 
 const packageSearchDigest = defineTable({

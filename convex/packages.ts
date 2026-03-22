@@ -57,8 +57,9 @@ type PublicPackageListItem = {
 };
 type PublicPageCursorState = {
   cursor: string | null;
+  offset: number;
+  pageSize: number | null;
   done: boolean;
-  buffer: PublicPackageListItem[];
 };
 const PUBLIC_PAGE_CURSOR_PREFIX = "pkgpage:";
 
@@ -175,24 +176,26 @@ function toPublicPackageListItem(digest: Doc<"packageSearchDigest">): PublicPack
 }
 
 function encodePublicPageCursor(state: PublicPageCursorState) {
-  if (state.done && state.buffer.length === 0) return "";
+  if (state.done && state.offset === 0) return "";
   return `${PUBLIC_PAGE_CURSOR_PREFIX}${JSON.stringify(state)}`;
 }
 
 function decodePublicPageCursor(raw: string | null | undefined): PublicPageCursorState {
-  if (!raw) return { cursor: null, done: false, buffer: [] };
+  if (!raw) return { cursor: null, offset: 0, pageSize: null, done: false };
   if (!raw.startsWith(PUBLIC_PAGE_CURSOR_PREFIX)) {
-    return { cursor: raw, done: false, buffer: [] };
+    return { cursor: raw, offset: 0, pageSize: null, done: false };
   }
   try {
     const parsed = JSON.parse(raw.slice(PUBLIC_PAGE_CURSOR_PREFIX.length)) as Partial<PublicPageCursorState>;
     return {
       cursor: typeof parsed.cursor === "string" ? parsed.cursor : null,
+      offset: typeof parsed.offset === "number" && parsed.offset > 0 ? parsed.offset : 0,
+      pageSize:
+        typeof parsed.pageSize === "number" && parsed.pageSize > 0 ? parsed.pageSize : null,
       done: parsed.done === true,
-      buffer: Array.isArray(parsed.buffer) ? parsed.buffer : [],
     };
   } catch {
-    return { cursor: null, done: false, buffer: [] };
+    return { cursor: null, offset: 0, pageSize: null, done: false };
   }
 }
 
@@ -309,8 +312,9 @@ export const listVersions = query({
     if (!pkg || pkg.softDeletedAt) return { page: [], isDone: true, continueCursor: "" };
     return await ctx.db
       .query("packageReleases")
-      .withIndex("by_package", (q) => q.eq("packageId", pkg._id))
-      .filter((q) => q.eq(q.field("softDeletedAt"), undefined))
+      .withIndex("by_package_active_created", (q) =>
+        q.eq("packageId", pkg._id).eq("softDeletedAt", undefined),
+      )
       .order("desc")
       .paginate(args.paginationOpts);
   },
@@ -358,45 +362,61 @@ export const listPublicPage = query({
     const targetCount = args.paginationOpts.numItems;
     const collected: PublicPackageListItem[] = [];
     const decodedCursor = decodePublicPageCursor(args.paginationOpts.cursor);
-    const buffered = [...decodedCursor.buffer];
     let cursor = decodedCursor.cursor;
+    let offset = decodedCursor.offset;
+    let pageSize = decodedCursor.pageSize;
     let done = decodedCursor.done;
     let loops = 0;
     const family = args.family;
     const channel = args.channel;
     const isOfficial = args.isOfficial;
 
-    while (buffered.length > 0 && collected.length < targetCount) {
-      const next = buffered.shift();
-      if (next) collected.push(next);
-    }
-
     while (!done && collected.length < targetCount && loops < MAX_PUBLIC_LIST_SCAN_PAGES) {
       loops += 1;
-      const pageSize = Math.max(targetCount * 3, targetCount);
+      const effectivePageSize =
+        offset > 0 && pageSize ? Math.max(pageSize, offset + 1) : Math.max(targetCount * 3, targetCount);
+      const pageCursor = cursor;
       const builder = buildPackageDigestQuery(ctx, { family, channel, isOfficial });
-      const page = await builder.order("desc").paginate({ cursor, numItems: pageSize });
-      for (const digest of page.page) {
+      const page = await builder.order("desc").paginate({ cursor: pageCursor, numItems: effectivePageSize });
+      for (let index = offset; index < page.page.length; index += 1) {
+        const digest = page.page[index];
         if (digest.channel === "private") continue;
         if (channel && digest.channel !== channel) continue;
         if (typeof isOfficial === "boolean" && digest.isOfficial !== isOfficial) {
           continue;
         }
         if (!digestMatchesFilters(digest, args)) continue;
-        buffered.push(toPublicPackageListItem(digest));
+        collected.push(toPublicPackageListItem(digest));
+        if (collected.length >= targetCount) {
+          const nextOffset = index + 1;
+          if (nextOffset < page.page.length) {
+            cursor = pageCursor;
+            offset = nextOffset;
+            pageSize = effectivePageSize;
+            done = page.isDone;
+          } else {
+            cursor = page.continueCursor;
+            offset = 0;
+            pageSize = effectivePageSize;
+            done = page.isDone;
+          }
+          return {
+            page: collected,
+            isDone: done && offset === 0,
+            continueCursor: encodePublicPageCursor({ cursor, offset, pageSize, done }),
+          };
+        }
       }
       done = page.isDone;
       cursor = page.continueCursor;
-      while (buffered.length > 0 && collected.length < targetCount) {
-        const next = buffered.shift();
-        if (next) collected.push(next);
-      }
+      offset = 0;
+      pageSize = effectivePageSize;
     }
 
     return {
       page: collected,
-      isDone: done && buffered.length === 0,
-      continueCursor: encodePublicPageCursor({ cursor, done, buffer: buffered }),
+      isDone: done,
+      continueCursor: encodePublicPageCursor({ cursor, offset, pageSize, done }),
     };
   },
 });
