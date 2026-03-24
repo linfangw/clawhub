@@ -4,10 +4,11 @@ import {
   PLATFORM_SKILL_LICENSE,
   PLATFORM_SKILL_LICENSE_SUMMARY,
 } from "clawhub-schema";
-import { Package } from "lucide-react";
+import { Download, Users } from "lucide-react";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { getSkillBadges } from "../lib/badges";
-import { formatCompactStat, formatSkillStatsTriplet } from "../lib/numberFormat";
+import { formatSkillStatsTriplet } from "../lib/numberFormat";
+import { installsTooltip } from "../lib/installsTooltip";
 import type { PublicPublisher, PublicSkill } from "../lib/publicUser";
 import { getRuntimeEnv } from "../lib/runtimeEnv";
 import { SkillInstallCard } from "./SkillInstallCard";
@@ -211,9 +212,23 @@ export function SkillHeader({
                 <strong>{PLATFORM_SKILL_LICENSE}</strong> · {PLATFORM_SKILL_LICENSE_SUMMARY}
               </div>
               <div className="stat">
-                ⭐ {formattedStats.stars} · <Package size={14} aria-hidden="true" />{" "}
-                {formattedStats.downloads} · {formatCompactStat(skill.stats.installsCurrent ?? 0)}{" "}
-                current installs · {formattedStats.installsAllTime} all-time installs
+                <Download size={14} aria-hidden="true" /> {formattedStats.downloads} downloads · ⭐{" "}
+                {formattedStats.stars}
+                {(skill.stats.installsAllTime ?? 0) > 0 ? (
+                  <>
+                    {" "}
+                    ·{" "}
+                    <span
+                      title={installsTooltip(
+                        skill.stats.installsAllTime ?? 0,
+                        skill.stats.installsCurrent ?? 0,
+                      )}
+                    >
+                      <Users size={14} aria-hidden="true" />{" "}
+                      {formattedStats.installsAllTime} installs
+                    </span>
+                  </>
+                ) : null}
               </div>
               <div className="stat">
                 <UserBadge
