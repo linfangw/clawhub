@@ -7,7 +7,7 @@ import {
 import { Download, Users } from "lucide-react";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { getSkillBadges } from "../lib/badges";
-import { formatSkillStatsTriplet } from "../lib/numberFormat";
+import { formatCompactStat, formatSkillStatsTriplet } from "../lib/numberFormat";
 import { installsTooltip } from "../lib/installsTooltip";
 import type { PublicPublisher, PublicSkill } from "../lib/publicUser";
 import { getRuntimeEnv } from "../lib/runtimeEnv";
@@ -117,6 +117,10 @@ export function SkillHeader({
 }: SkillHeaderProps) {
   const convexSiteUrl = getRuntimeEnv("VITE_CONVEX_SITE_URL") ?? "https://clawhub.ai";
   const formattedStats = formatSkillStatsTriplet(skill.stats);
+  const installsAllTime = skill.stats.installsAllTime ?? 0;
+  const installsCurrent = skill.stats.installsCurrent ?? 0;
+  const shouldShowInstalls = installsAllTime > 0 || installsCurrent > 0;
+  const installsDisplay = installsAllTime > 0 ? formattedStats.installsAllTime : formatCompactStat(installsCurrent);
   const suppressScanResults =
     !isStaff &&
     Boolean(modInfo?.overrideActive) &&
@@ -214,18 +218,14 @@ export function SkillHeader({
               <div className="stat">
                 <Download size={14} aria-hidden="true" /> {formattedStats.downloads} downloads · ⭐{" "}
                 {formattedStats.stars}
-                {(skill.stats.installsAllTime ?? 0) > 0 ? (
+                {shouldShowInstalls ? (
                   <>
                     {" "}
                     ·{" "}
                     <span
-                      title={installsTooltip(
-                        skill.stats.installsAllTime ?? 0,
-                        skill.stats.installsCurrent ?? 0,
-                      )}
+                      title={installsTooltip(installsAllTime, installsCurrent)}
                     >
-                      <Users size={14} aria-hidden="true" />{" "}
-                      {formattedStats.installsAllTime} installs
+                      <Users size={14} aria-hidden="true" /> {installsDisplay} installs
                     </span>
                   </>
                 ) : null}
